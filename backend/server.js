@@ -42,10 +42,10 @@ app.listen(port, () => {
 
 const path = require("path");
 
-// Serve frontend build files
-app.use(express.static(path.join(__dirname, "../frontend/build")));
+// Serve static files from Vite build
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // Handle React routing
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/build/index.html"));
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
