@@ -1,0 +1,51 @@
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const dotenv = require("dotenv");
+
+dotenv.config();
+
+const authRoutes = require("./routes/auth");
+const jobRoutes = require("./routes/jobs");
+const profileRoutes = require("./routes/profiles");
+const adminRoutes = require("./routes/admin");
+const notificationRoutes = require("./routes/notifications");
+const paymentRoutes = require("./routes/payments");
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+const mongoUri = process.env.MONGODB_URI;
+mongoose
+  .connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  });
+
+app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/profiles", profileRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/payments", paymentRoutes);
+
+// optional: health check
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
+
+const path = require("path");
+
+// Serve frontend build files
+app.use(express.static(path.join(__dirname, "../frontend/build")));
+
+// Handle React routing
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/build/index.html"));
+});
