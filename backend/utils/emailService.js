@@ -10,9 +10,26 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  debug: true, // Output SMTP traffic to console
-  logger: true // Log information to console
+  debug: false, // Set true temporarily to debug SMTP traffic
+  logger: false,
 });
+
+// Verify SMTP connection on startup (only if credentials are configured)
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter.verify((error) => {
+    if (error) {
+      console.error("❌ SMTP Connection Error:", error.message);
+      console.error(
+        "   → Emails will NOT be sent. Check EMAIL_USER and EMAIL_PASS in your .env file.",
+      );
+      console.error(
+        "   → For Gmail: ensure you are using an App Password (16 chars, no spaces).",
+      );
+    } else {
+      console.log("✅ SMTP server is ready — emails will be sent via Gmail.");
+    }
+  });
+}
 
 const sendEmail = async (options) => {
   try {

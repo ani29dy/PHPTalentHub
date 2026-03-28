@@ -156,8 +156,9 @@ router.post(
       await user.save();
 
       // Create business profile if registering as business
+      let newBusinessProfile = null;
       if (role === "business" && businessProfile) {
-        const newBusinessProfile = new BusinessProfile({
+        newBusinessProfile = new BusinessProfile({
           user: user._id,
           ...businessProfile,
           verified: false,
@@ -176,10 +177,23 @@ router.post(
         user.verificationToken,
       );
 
+      // If email failed to send, roll back registration so the user can try again
+      if (!emailSent) {
+        console.error(`❌ Verification email failed for ${email}. Rolling back user creation.`);
+        if (newBusinessProfile) {
+          await BusinessProfile.findByIdAndDelete(newBusinessProfile._id);
+        }
+        await User.findByIdAndDelete(user._id);
+        return res.status(500).json({
+          message:
+            "Registration failed: we could not send your verification email. Please check your email address and try again, or contact support.",
+        });
+      }
+
       res.status(201).json({
         message:
           "Registration successful! Please check your email to verify your account.",
-        emailSent: !!emailSent,
+        emailSent: true,
       });
     } catch (err) {
       console.error(err.message);
