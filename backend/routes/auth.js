@@ -5,6 +5,8 @@ const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
 const BusinessProfile = require("../models/BusinessProfile");
 const { auth } = require("../middleware/auth");
+const crypto = require("crypto");
+const { sendVerificationEmail } = require("../utils/emailService");
 
 const router = express.Router();
 
@@ -43,6 +45,8 @@ router.post(
         email,
         password: hashedPassword,
         role,
+        verificationToken: crypto.randomBytes(32).toString("hex"),
+        isVerified: false
       });
 
       await user.save();
@@ -62,30 +66,13 @@ router.post(
         await user.save();
       }
 
-      const payload = {
-        user: {
-          id: user.id,
-          role: user.role,
-        },
-      };
+      // Send Verification Email
+      const emailSent = await sendVerificationEmail(user, user.verificationToken);
 
-      jwt.sign(
-        payload,
-        process.env.JWT_SECRET || "your_jwt_secret",
-        { expiresIn: "7d" },
-        (err, token) => {
-          if (err) throw err;
-          res.json({
-            token,
-            user: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-            },
-          });
-        },
-      );
+      res.status(201).json({
+        message: "Registration successful! Please check your email to verify your account.",
+        emailSent: !!emailSent
+      });
     } catch (err) {
       console.error(err.message);
       res.status(500).send("Server error");
@@ -112,6 +99,14 @@ router.post(
       const user = await User.findOne({ email });
       if (!user) {
         return res.status(400).json({ message: "Invalid credentials" });
+      }
+
+      // Check if user is verified
+      if (!user.isVerified) {
+        return res.status(401).json({ 
+          message: "Please verify your email before logging in. Check your inbox (including spam).",
+          unverified: true 
+        });
       }
 
       const isMatch = await bcrypt.compare(password, user.password);
@@ -158,6 +153,36 @@ router.get("/me", auth, async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
+  }
+});
+
+// Verify email token
+router.get("/verify/:token", async (req, res) => {
+  try {
+    const user = await User.findOne({ verificationToken: req.params.token });
+    
+    if (!user) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired verification token." 
+      });
+    }
+
+    // Update user status
+    user.isVerified = true;
+    user.verificationToken = undefined; // Clear the token
+    await user.save();
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Email verified successfully! You can now log in." 
+    });
+  } catch (err) {
+    console.error("Verification Error:", err.message);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error during verification. Please try again later." 
+    });
   }
 });
 

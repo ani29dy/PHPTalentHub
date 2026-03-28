@@ -120,9 +120,6 @@ const BusinessDashboard = () => {
           <p className="text-slate-500 text-sm mt-0.5">Welcome back, {user?.name}</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/business/profile/edit" className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm">
-            ✎ Edit Profile
-          </Link>
           <Link to="/create-job" className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-violet-200">
             + Post a Job
           </Link>

@@ -14,6 +14,8 @@ import JobDetail from "./pages/JobDetail";
 import CreateJob from "./pages/CreateJob";
 import EditJob from "./pages/EditJob";
 import EditBusinessProfile from "./pages/EditBusinessProfile";
+import EditDeveloperProfile from "./pages/EditDeveloperProfile";
+import VerifyEmail from "./pages/VerifyEmail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -27,6 +29,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/search" element={<SearchDevelopers />} />
             <Route path="/jobs" element={<JobListings />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
@@ -76,6 +79,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["business"]}>
                   <EditBusinessProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/developer/profile/edit"
+              element={
+                <ProtectedRoute allowedRoles={["developer"]}>
+                  <EditDeveloperProfile />
                 </ProtectedRoute>
               }
             />

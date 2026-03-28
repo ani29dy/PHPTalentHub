@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 interface BusinessProfileData {
@@ -48,9 +48,9 @@ const Register = () => {
   const [benefitInput, setBenefitInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -144,7 +144,8 @@ const Register = () => {
         registrationData.role,
         userType === "business" ? businessData : undefined,
       );
-      navigate("/");
+      setIsRegistered(true);
+      window.scrollTo(0, 0);
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
@@ -157,14 +158,44 @@ const Register = () => {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-extrabold text-gray-900">
-            Join PHP Talent Hub
+            {isRegistered ? "Verify Your Email" : "Join PHP Talent Hub"}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Connect PHP developers with amazing companies
+            {isRegistered 
+              ? `We've sent a verification link to ${formData.email}`
+              : "Connect PHP developers with amazing companies"}
           </p>
         </div>
 
-        {/* User Type Selection */}
+        {isRegistered ? (
+          <div className="max-w-xl mx-auto bg-white rounded-lg shadow-md p-8 text-center border-t-4 border-blue-600">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Check Your Inbox</h3>
+            <p className="text-gray-600 mb-6">
+              Please click the activation link in the email we sent to <strong>{formData.email}</strong> to complete your registration.
+            </p>
+            <div className="bg-blue-50 p-4 rounded-md mb-8 text-sm text-blue-800 text-left">
+              <p className="font-semibold mb-1">Didn't receive the email?</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Check your spam or junk folder</li>
+                <li>Make sure you entered the correct email address</li>
+                <li>Wait a few minutes as delivery can sometimes be delayed</li>
+              </ul>
+            </div>
+            <Link 
+              to="/login" 
+              className="inline-block bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Login Page
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* User Type Selection */}
         <div className="flex justify-center mb-8">
           <div className="bg-white rounded-lg shadow-md p-1 flex">
             <button
@@ -639,17 +670,22 @@ const Register = () => {
           )}
         </div>
 
-        <div className="text-center mt-8">
-          <p className="text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link
-              to="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              Sign in
-            </Link>
-          </p>
-        </div>
+          </>
+        )}
+
+        {!isRegistered && (
+          <div className="text-center mt-8">
+            <p className="text-sm text-gray-600">
+              Already have an account?{" "}
+              <Link
+                to="/login"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

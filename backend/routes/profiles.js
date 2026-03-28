@@ -4,9 +4,82 @@ const Profile = require("../models/Profile");
 const BusinessProfile = require("../models/BusinessProfile");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
+const Activity = require("../models/Activity");
 const { auth } = require("../middleware/auth");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const streamifier = require("streamifier");
 
 const router = express.Router();
+
+// Cloudinary Configuration
+console.log("Cloudinary Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME); // Debugging
+console.log("Cloudinary API Key Loaded:", !!process.env.CLOUDINARY_API_KEY); // Debugging
+
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+  });
+} else {
+  console.error("CRITICAL: Cloudinary environment variables NOT found in process.env!");
+}
+
+// Multer storage in memory
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Unified Tracking & Notification Helper
+const logAndNotify = async (profileId, visitorId, type) => {
+  try {
+    // 1. Log Activity
+    const activity = new Activity({ profileId, visitorId, type });
+    await activity.save();
+
+    // 2. Send Notification to Developer
+    const profile = await Profile.findById(profileId).populate("userId");
+    const visitor = await User.findById(visitorId).populate("businessProfile");
+    
+    if (!profile || !visitor) return;
+
+    const visitorName = visitor.businessProfile?.companyName || visitor.name;
+    let title = "";
+    let message = "";
+
+    switch (type) {
+      case "view":
+        title = "Profile View 👀";
+        message = `${visitorName} viewed your professional profile.`;
+        break;
+      case "download":
+        title = "CV Download 📥";
+        message = `${visitorName} downloaded your resume.`;
+        break;
+      case "portfolio_visit":
+        title = "Portfolio Visit 🔗";
+        message = `${visitorName} clicked on your portfolio link.`;
+        break;
+      case "hire_inquiry":
+        title = "Hire Inquiry ✉️";
+        message = `${visitorName} is interested in hiring you!`;
+        break;
+    }
+
+    const Notification = require("../models/Notification");
+    const notification = new Notification({
+      recipient: profile.userId._id,
+      sender: visitorId,
+      type: "activity",
+      title,
+      message,
+      link: `/developer-dashboard?filter=${type}`
+    });
+    await notification.save();
+  } catch (err) {
+    console.error("Tracking/Notification Error:", err);
+  }
+};
 
 // Get all profiles (for business search)
 router.get("/", async (req, res) => {
@@ -26,6 +99,11 @@ router.get("/", async (req, res) => {
       query.languages = { $regex: languages, $options: "i" };
     }
 
+    // ✅ Specializations (partial match)
+    if (req.query.specializations) {
+      query.specializations = { $regex: req.query.specializations, $options: "i" };
+    }
+
     // ✅ Location (partial match)
     if (location) {
       query.location = { $regex: location, $options: "i" };
@@ -34,6 +112,16 @@ router.get("/", async (req, res) => {
     // ✅ Experience (exact match)
     if (experience) {
       query.experience = experience;
+    }
+
+    // ✅ Exclude self if logged in
+    const token = req.header("x-auth-token") || req.header("Authorization")?.replace("Bearer ", "");
+    if (token) {
+      const jwt = require("jsonwebtoken");
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret");
+        query.userId = { $ne: decoded.user.id };
+      } catch (e) { /* ignore invalid tokens */ }
     }
 
     // Sort by verified to prioritize verified developers!
@@ -66,8 +154,21 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { skills, languages, experience, location, portfolio, bio } =
-      req.body;
+    const {
+      skills,
+      languages,
+      specializations,
+      experience,
+      location,
+      portfolio,
+      linkedin,
+      bio,
+      workExperience,
+      education,
+      projects,
+      certifications,
+      hobbies,
+    } = req.body;
 
     try {
       let profile = await Profile.findOne({ userId: req.user.user.id });
@@ -79,7 +180,14 @@ router.post(
         profile.experience = experience;
         profile.location = location;
         profile.portfolio = portfolio;
+        profile.linkedin = linkedin;
         profile.bio = bio;
+        profile.workExperience = workExperience;
+        profile.education = education;
+        profile.projects = projects;
+        profile.certifications = certifications;
+        profile.hobbies = hobbies;
+        profile.specializations = specializations;
         await profile.save();
       } else {
         // Create new profile
@@ -90,7 +198,14 @@ router.post(
           experience,
           location,
           portfolio,
+          linkedin,
           bio,
+          workExperience,
+          education,
+          projects,
+          certifications,
+          hobbies,
+          specializations,
         });
         await profile.save();
       }
@@ -121,6 +236,199 @@ router.post("/request-verification", auth, async (req, res) => {
   }
 });
 
+// Upload resume to Cloudinary
+router.post("/resume/upload", auth, upload.single("resume"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Check file type
+    const allowedTypes = [
+      "application/pdf", 
+      "application/msword", 
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: "Only PDF and Word documents are allowed" });
+    }
+
+    // Move Cloudinary configuration inside the route for reliability
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+
+    console.log("Cloudinary Uploading with Key:", process.env.CLOUDINARY_API_KEY ? "EXISTS" : "MISSING");
+
+    // Upload to Cloudinary using stream
+    let streamUpload = (req) => {
+      return new Promise((resolve, reject) => {
+        let stream = cloudinary.uploader.upload_stream(
+          { 
+            resource_type: "raw", 
+            folder: "resumes",
+            public_id: `resume_${req.user.user.id}_${Date.now()}`
+          },
+          (error, result) => {
+            if (result) {
+              resolve(result);
+            } else {
+              console.error("Cloudinary Stream Upload Error Detail:", error); // Added detail
+              reject(error);
+            }
+          }
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+    };
+
+    const result = await streamUpload(req);
+
+    // Update profile with resume URL
+    const profile = await Profile.findOne({ userId: req.user.user.id });
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    profile.resumeUrl = result.secure_url;
+    profile.resumeName = req.file.originalname;
+    await profile.save();
+
+    res.json({ 
+      message: "Resume uploaded successfully", 
+      resumeUrl: result.secure_url,
+      resumeName: req.file.originalname 
+    });
+  } catch (err) {
+    console.error("Cloudinary Upload Error:", err);
+    res.status(500).json({ message: "Upload failed", error: err.message });
+  }
+});
+
+// Track Profile View (explicit)
+router.post("/view/:userId", auth, async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ userId: req.params.userId });
+    if (!profile) return res.status(404).json({ message: "Profile not found" });
+
+    if (req.user.user.role === "business" && req.user.user.id !== req.params.userId) {
+      await logAndNotify(profile._id, req.user.user.id, "view");
+    }
+    res.json({ message: "View tracked" });
+  } catch (err) {
+    res.status(500).send("Server error");
+  }
+});
+
+// Track & Redirect Resume Download
+router.get("/resume/download/:userId", async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ userId: req.params.userId });
+    if (!profile || !profile.resumeUrl) return res.status(404).json({ message: "Resume not found" });
+
+    // Extract token from query or header
+    const token = req.query.token || req.header("x-auth-token") || req.header("Authorization")?.replace("Bearer ", "");
+    if (token) {
+      const jwt = require("jsonwebtoken");
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret");
+        if (decoded.user.role === "business" && decoded.user.id !== req.params.userId) {
+          await logAndNotify(profile._id, decoded.user.id, "download");
+        }
+      } catch (e) { console.error("Download tracking auth failed:", e.message); }
+    }
+    
+    res.redirect(profile.resumeUrl);
+  } catch (err) {
+    res.status(500).send("Server error");
+  }
+});
+
+// Track & Redirect Portfolio Visit
+router.get("/portfolio/visit/:userId", async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ userId: req.params.userId });
+    if (!profile || !profile.portfolio) return res.status(404).json({ message: "Portfolio not found" });
+
+    const token = req.query.token || req.header("x-auth-token") || req.header("Authorization")?.replace("Bearer ", "");
+    if (token) {
+      const jwt = require("jsonwebtoken");
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret");
+        if (decoded.user.role === "business" && decoded.user.id !== req.params.userId) {
+          await logAndNotify(profile._id, decoded.user.id, "portfolio_visit");
+        }
+      } catch (e) { console.error("Portfolio tracking auth failed:", e.message); }
+    }
+    
+    res.redirect(profile.portfolio);
+  } catch (err) {
+    res.status(500).send("Server error");
+  }
+});
+
+// Upload avatar (profile image) to Cloudinary
+router.post("/avatar/upload", auth, upload.single("avatar"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Check file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: "Only JPEG, PNG and WEBP images are allowed" });
+    }
+
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+
+    // Upload using stream
+    let streamUpload = (req) => {
+      return new Promise((resolve, reject) => {
+        let stream = cloudinary.uploader.upload_stream(
+          { 
+            folder: "avatars",
+            transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }]
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+    };
+
+    const result = await streamUpload(req);
+
+    // Update profile
+    const profile = await Profile.findOne({ userId: req.user.user.id });
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    profile.profileImage = result.secure_url;
+    await profile.save();
+
+    res.json({ 
+      message: "Profile picture updated successfully", 
+      profileImage: result.secure_url 
+    });
+  } catch (err) {
+    console.error("Avatar Upload Error:", err);
+    res.status(500).json({ message: "Upload failed", error: err.message });
+  }
+});
+
 // Get my profile
 router.get("/me/profile", auth, async (req, res) => {
   try {
@@ -129,6 +437,116 @@ router.get("/me/profile", auth, async (req, res) => {
       return res.status(404).json({ message: "Profile not found" });
     }
     res.json(profile);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+// Get Developer Dashboard stats
+const Application = require("../models/JobApplication");
+
+router.get("/me/dashboard-stats", auth, async (req, res) => {
+  try {
+    const userId = req.user.user.id;
+    
+    // 1. Get Application Stats
+    const applications = await Application.find({ developerId: userId });
+    
+    const stats = {
+      totalApplications: applications.length,
+      pending: applications.filter(a => a.status === 'pending').length,
+      accepted: applications.filter(a => a.status === 'accepted').length,
+      rejected: applications.filter(a => a.status === 'rejected').length,
+      totalViews: 0,
+      totalDownloads: 0,
+      totalPortfolioVisits: 0,
+      totalHireInquiries: 0,
+    };
+
+    // 2. Get Recruiter Actions (Hire Requests)
+    const recruiterActions = await Notification.find({
+      recipient: userId,
+      type: "hire_request"
+    })
+    .populate('sender', 'name email')
+    .sort({ createdAt: -1 })
+    .limit(10); // Show recent 10
+
+    // 3. Get Profile Completion Info
+    const profile = await Profile.findOne({ userId });
+    let profileStrength = 0;
+    const insights = [];
+
+    if (profile) {
+      profileStrength += 10; // Basic details present
+      if (profile.skills && profile.skills.length > 0) { profileStrength += 10; } else { insights.push("Add skills"); }
+      if (profile.location) { profileStrength += 5; } else { insights.push("Add location"); }
+      if (profile.experience) { profileStrength += 5; } else { insights.push("Set experience level"); }
+      if (profile.bio) { profileStrength += 10; } else { insights.push("Add a professional summary"); }
+      if (profile.portfolio) { profileStrength += 5; } else { insights.push("Link your portfolio/GitHub"); }
+      if (profile.workExperience && profile.workExperience.length > 0) { profileStrength += 15; } else { insights.push("Add work experience"); }
+      if (profile.education && profile.education.length > 0) { profileStrength += 10; } else { insights.push("Add education history"); }
+      if (profile.projects && profile.projects.length > 0) { profileStrength += 15; } else { insights.push("Add some projects"); }
+      if (profile.certifications && profile.certifications.length > 0) { profileStrength += 5; } else { insights.push("Add certifications"); }
+      if (profile.hobbies && profile.hobbies.length > 0) { profileStrength += 5; } else { insights.push("Add hobbies"); }
+      if (profile.verified) { profileStrength += 5; } else { insights.push("Get verified to rank #1"); }
+      if (profile.profileImage) { profileStrength += 5; } else { insights.push("Add a profile picture"); }
+    } else {
+      insights.push("Create your developer profile");
+    }
+
+    // 4. Get Activity Stats (Views & Downloads)
+    const profileDoc = await Profile.findOne({ userId });
+    let totalViews = 0;
+    let totalDownloads = 0;
+    let recentInterest = [];
+
+    if (profileDoc) {
+      stats.totalViews = await Activity.countDocuments({ profileId: profileDoc._id, type: "view" });
+      stats.totalDownloads = await Activity.countDocuments({ profileId: profileDoc._id, type: "download" });
+      stats.totalPortfolioVisits = await Activity.countDocuments({ profileId: profileDoc._id, type: "portfolio_visit" });
+      stats.totalHireInquiries = await Activity.countDocuments({ profileId: profileDoc._id, type: "hire_inquiry" });
+      
+      // Get unique recent visitors (Businesses)
+      const activities = await Activity.find({ profileId: profileDoc._id })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'visitorId',
+          select: 'name businessProfile',
+          populate: { path: 'businessProfile', select: 'companyName logo industry' }
+        })
+        .limit(20);
+
+      const seen = new Set();
+      recentInterest = activities
+        .map(a => {
+          if (!a.visitorId) return null;
+          const companyName = a.visitorId.businessProfile?.companyName || a.visitorId.name || "A Recruiter";
+          const logo = a.visitorId.businessProfile?.logo;
+          const type = a.type;
+          const industry = a.visitorId.businessProfile?.industry;
+          const date = a.createdAt;
+
+          const key = `${companyName}-${type}`;
+          if (seen.has(key)) return null;
+          seen.add(key);
+
+          return { companyName, logo, type, industry, date };
+        })
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+
+    res.json({
+      stats,
+      recruiterActions,
+      profileStrength: Math.min(profileStrength, 100),
+      insights,
+      profile,
+      recentInterest
+    });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
@@ -237,15 +655,29 @@ router.post("/business/request-verification", auth, async (req, res) => {
   }
 });
 
-// Get developer profile by userId (public) — MUST be last to avoid shadowing /business/* routes
-router.get("/:userId", async (req, res) => {
+// Get developer profile by userId (public)
+router.get("/:userId", async (req, res) => { // Removed 'auth' middleware to keep it public, but will track if token is present
   try {
     const profile = await Profile.findOne({
       userId: req.params.userId,
     }).populate("userId", "name email");
+    
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });
     }
+
+    // Optional: Auto-track view if a token is passed in header (non-blocking)
+    const token = req.header("x-auth-token");
+    if (token) {
+      const jwt = require("jsonwebtoken");
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.user.role === "business" && decoded.user.id !== req.params.userId) {
+          await logAndNotify(profile._id, decoded.user.id, "view");
+        }
+      } catch (e) { /* ignore invalid tokens */ }
+    }
+
     res.json(profile);
   } catch (err) {
     console.error(err.message);
@@ -257,24 +689,15 @@ router.get("/:userId", async (req, res) => {
 router.post("/:userId/hire-notify", auth, async (req, res) => {
   try {
     const developerId = req.params.userId;
-    const businessId = req.user.user.id;
+    const profile = await Profile.findOne({ userId: developerId });
+    if (!profile) return res.status(404).json({ message: "Profile not found" });
 
-    // Optional: Only create notification if sender is a business
-    if (req.user.user.role === "business") {
-      const businessUser = await User.findById(businessId);
-      
-      const notification = new Notification({
-        recipient: developerId,
-        sender: businessId,
-        type: "system", // Or a new type like "hire_request"
-        title: "New Hire Inquiry",
-        message: `${businessUser.name} is interested in hiring you! They have been securely redirected to email you outside the platform.`,
-        link: "", 
-      });
-      await notification.save();
+    // Track if sender is a business
+    if (req.user.user.role === "business" && req.user.user.id !== req.params.userId) {
+      await logAndNotify(profile._id, req.user.user.id, "hire_inquiry");
     }
     
-    res.json({ message: "Notification sent successfully" });
+    res.json({ message: "Notification sent & tracked" });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");

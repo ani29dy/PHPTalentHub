@@ -32,6 +32,10 @@ const profileSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  linkedin: {
+    type: String,
+    trim: true,
+  },
   verified: {
     type: Boolean,
     default: false,
@@ -55,6 +59,54 @@ const profileSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-});
+  workExperience: [
+    {
+      jobTitle: String,
+      company: String,
+      location: String,
+      startDate: Date,
+      endDate: Date,
+      isCurrent: Boolean,
+      description: String,
+    },
+  ],
+  education: [
+    {
+      degree: String,
+      institution: String,
+      year: String,
+      fieldOfStudy: String,
+    },
+  ],
+  projects: [
+    {
+      title: String,
+      description: String,
+      link: String,
+      techStack: [String],
+    },
+  ],
+  certifications: [
+    {
+      name: String,
+      issuer: String,
+      year: String,
+      link: String,
+    },
+  ],
+  hobbies: [String],
+  resumeUrl: {
+    type: String,
+  },
+  resumeName: {
+    type: String,
+  },
+  specializations: [
+    {
+      type: String,
+      trim: true,
+    },
+  ],
+}, { timestamps: true });
 
 module.exports = mongoose.model("Profile", profileSchema);

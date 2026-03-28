@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
@@ -7,6 +7,8 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [searchParams] = useSearchParams();
+  const verifiedStatus = searchParams.get('verified');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -43,6 +45,20 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {verifiedStatus === 'success' && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start mb-4">
+              <span className="shrink-0 mt-0.5">✅</span>
+              <span>Account verified successfully! You can now log in.</span>
+            </div>
+          )}
+
+          {verifiedStatus === 'error' && (
+            <div className="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start mb-4">
+              <span className="shrink-0 mt-0.5">⚠️</span>
+              <span>The verification link is invalid or has expired.</span>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start">
               <span className="shrink-0 mt-0.5">⚠</span>

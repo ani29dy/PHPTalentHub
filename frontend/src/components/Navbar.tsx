@@ -63,15 +63,15 @@ const Navbar = () => {
             {user ? (
               <>
                 <NotificationBell />
-                <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-full pl-1 pr-3 py-1">
-                  <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold uppercase">
+                <Link to={user.role === "business" ? "/business/profile/edit" : "/developer/profile/edit"} className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:border-violet-500 rounded-full pl-1 pr-3 py-1 transition-all cursor-pointer group">
+                  <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm group-hover:bg-violet-500 transition-colors">
                     {user.name?.charAt(0)}
                   </div>
-                  <span className="text-slate-300 text-sm font-medium">{user.name}</span>
+                  <span className="text-slate-300 text-sm font-medium group-hover:text-white transition-colors">{user.name}</span>
                   <span className="text-xs text-violet-400 font-semibold capitalize bg-violet-500/10 px-2 py-0.5 rounded-full">
                     {user.role}
                   </span>
-                </div>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
@@ -128,15 +128,15 @@ const Navbar = () => {
                     <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Alerts</span>
                     <NotificationBell />
                   </div>
-                  <div className="flex items-center gap-3 px-3 py-2 border-t border-slate-800">
+                  <Link to={user.role === "business" ? "/business/profile/edit" : "/developer/profile/edit"} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 border-t border-slate-800 hover:bg-slate-800 transition-colors -mx-2 rounded-lg cursor-pointer">
                     <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-sm font-bold uppercase">
                       {user.name?.charAt(0)}
                     </div>
                     <div>
                       <p className="text-white text-sm font-semibold">{user.name}</p>
-                      <p className="text-violet-400 text-xs capitalize">{user.role}</p>
+                      <p className="text-violet-400 text-xs capitalize">Edit Profile ({user.role})</p>
                     </div>
-                  </div>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="w-full text-left text-red-400 hover:text-white hover:bg-red-500 px-4 py-3 rounded-lg text-sm font-semibold transition-all"
