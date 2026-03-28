@@ -46,7 +46,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Set global axios defaults
-  axios.defaults.baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:5000");
+  axios.defaults.baseURL =
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? "" : "http://localhost:5000");
 
   // Request Interceptor: Attach token to every request
   useEffect(() => {
@@ -58,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => Promise.reject(error),
     );
 
     // Response Interceptor: Handle 401s and auto-logout
@@ -70,7 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           logout();
         }
         return Promise.reject(error);
-      }
+      },
     );
 
     // Cleanup interceptors on unmount
@@ -101,14 +103,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await axios.post("/api/auth/login", { email, password });
       const { token: newToken, user: userData } = response.data;
-      
+
       // 1. Store in localStorage (Persistent Storage)
       localStorage.setItem("token", newToken);
-      
+
       // 2. Update React State (UI Refresh)
       setToken(newToken);
       setUser(userData);
-      
+
       return response.data;
     } catch (error) {
       throw error;
@@ -123,13 +125,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     businessProfile?: any,
   ) => {
     try {
-      const response = await axios.post("/api/auth/register", {
+      const requestData: any = {
         name,
         email,
         password,
         role,
-        ...(businessProfile && { businessProfile }),
-      });
+      };
+
+      if (businessProfile) {
+        requestData.businessProfile = businessProfile;
+      }
+
+      const response = await axios.post("/api/auth/register", requestData);
       return response.data;
     } catch (error) {
       throw error;
@@ -139,14 +146,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     // 1. Remove from localStorage (Purge Storage)
     localStorage.removeItem("token");
-    
+
     // 2. Clear React State (Purge UI State)
     setToken(null);
     setUser(null);
-    
+
     // 3. Clear Axios Headers (Purge Network Config)
     delete axios.defaults.headers.common["Authorization"];
-    
+
     console.log("Logout successful: Tokens cleared from storage.");
   };
 

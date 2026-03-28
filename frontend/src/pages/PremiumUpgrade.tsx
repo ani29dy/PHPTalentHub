@@ -15,6 +15,20 @@ const PremiumUpgrade = () => {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  const loadScript = (src: string) => {
+    return new Promise((resolve) => {
+      if (typeof window.Razorpay !== "undefined") {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const benefits = [
     {
       title: "Verified Pro Badge",
@@ -43,6 +57,11 @@ const PremiumUpgrade = () => {
     setError("");
 
     try {
+      const isLoaded = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
+      if (!isLoaded) {
+        throw new Error("Razorpay SDK failed to load. Check your connection.");
+      }
+
       // 1. Create order on backend
       const { data } = await axios.post("/api/payments/create-order", { plan });
       const { order, key_id } = data;
