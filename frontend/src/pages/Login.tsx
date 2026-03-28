@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
@@ -16,9 +17,26 @@ const Login = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  const handleResend = async () => {
+    setResendLoading(true);
+    setResendMessage("");
+    try {
+      await axios.post("/api/auth/resend-verification", { email: formData.email });
+      setResendMessage("Verification link sent! Check your inbox.");
+    } catch (err: any) {
+      setResendMessage(err.response?.data?.message || "Failed to resend. Try again later.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setResendMessage("");
     setLoading(true);
     try {
       await login(formData.email, formData.password);
@@ -31,8 +49,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-sm p-8 sm:p-10 animate-fade-in-up">
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-slate-50">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-xl p-8 sm:p-10 animate-fade-in-up">
         
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-violet-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto mb-5 shadow-lg shadow-violet-200 php-badge-glow">
@@ -46,23 +64,37 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {verifiedStatus === 'success' && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start mb-4">
-              <span className="shrink-0 mt-0.5">✅</span>
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-4 rounded-2xl text-sm font-medium flex gap-3 items-start mb-4">
+              <span className="shrink-0 text-lg">✅</span>
               <span>Account verified successfully! You can now log in.</span>
             </div>
           )}
 
-          {verifiedStatus === 'error' && (
-            <div className="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start mb-4">
-              <span className="shrink-0 mt-0.5">⚠️</span>
-              <span>The verification link is invalid or has expired.</span>
-            </div>
-          )}
-
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium flex gap-2 items-start">
-              <span className="shrink-0 mt-0.5">⚠</span>
-              <span>{error}</span>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-4 rounded-2xl text-sm font-medium flex flex-col gap-3">
+              <div className="flex gap-3 items-start">
+                <span className="shrink-0 text-lg">⚠️</span>
+                <span>{error}</span>
+              </div>
+              
+              {/* Specialized Resend Button if not verified */}
+              {error.toLowerCase().includes("verify") && (
+                <div className="pt-2 border-t border-red-200 mt-1">
+                   <button 
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resendLoading}
+                    className="text-xs bg-white text-red-600 border border-red-200 px-3 py-2 rounded-lg font-black hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {resendLoading ? "SENDING..." : "RESEND VERIFICATION LINK"}
+                  </button>
+                  {resendMessage && (
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-red-500 animate-pulse">
+                      {resendMessage}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

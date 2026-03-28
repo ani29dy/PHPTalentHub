@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 
 interface BusinessProfileData {
@@ -104,6 +105,22 @@ const Register = () => {
     }));
   };
 
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  const handleResend = async () => {
+    setResendLoading(true);
+    setResendMessage("");
+    try {
+      await axios.post("/api/auth/resend-verification", { email: formData.email });
+      setResendMessage("Verification email resent! Please check your inbox again.");
+    } catch (err: any) {
+      setResendMessage(err.response?.data?.message || "Failed to resend email. Please try again later.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -129,19 +146,11 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const registrationData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: userType,
-        ...(userType === "business" && { businessProfile: businessData }),
-      };
-
       await register(
-        registrationData.name,
-        registrationData.email,
-        registrationData.password,
-        registrationData.role,
+        formData.name,
+        formData.email,
+        formData.password,
+        userType,
         userType === "business" ? businessData : undefined,
       );
       setIsRegistered(true);
@@ -154,44 +163,54 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-extrabold text-gray-900">
-            {isRegistered ? "Verify Your Email" : "Join PHP Talent Hub"}
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {isRegistered 
-              ? `We've sent a verification link to ${formData.email}`
-              : "Connect PHP developers with amazing companies"}
-          </p>
-        </div>
-
+    <div className="min-h-[calc(100vh-64px)] bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+      <div className="max-w-4xl w-full">
         {isRegistered ? (
-          <div className="max-w-xl mx-auto bg-white rounded-lg shadow-md p-8 text-center border-t-4 border-blue-600">
-            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+          <div className="max-w-xl mx-auto bg-white rounded-3xl border border-slate-100 shadow-xl p-10 text-center animate-fade-in-up">
+            <div className="w-20 h-20 bg-violet-50 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+               <span className="text-4xl">📧</span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Check Your Inbox</h3>
-            <p className="text-gray-600 mb-6">
-              Please click the activation link in the email we sent to <strong>{formData.email}</strong> to complete your registration.
+            <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Check your email</h2>
+            <p className="text-slate-600 mb-8 leading-relaxed">
+              We've sent a secure verification link to <br/>
+              <strong className="text-slate-900 font-bold">{formData.email}</strong>.<br/>
+              Please click the link to activate your account.
             </p>
-            <div className="bg-blue-50 p-4 rounded-md mb-8 text-sm text-blue-800 text-left">
-              <p className="font-semibold mb-1">Didn't receive the email?</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Check your spam or junk folder</li>
-                <li>Make sure you entered the correct email address</li>
-                <li>Wait a few minutes as delivery can sometimes be delayed</li>
+            
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8 text-left">
+              <h4 className="text-sm font-black text-slate-900 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                <span className="w-5 h-5 bg-violet-600 rounded-md flex items-center justify-center text-[10px] text-white">?</span>
+                Didn't get the email?
+              </h4>
+              <ul className="text-xs text-slate-500 space-y-2 list-none p-0">
+                <li className="flex gap-2"><span>•</span> Check your spam or promotions folder</li>
+                <li className="flex gap-2"><span>•</span> Verify that your email address is correct</li>
+                <li className="flex gap-2 font-medium text-slate-700">
+                  <span>•</span> 
+                  <button 
+                    onClick={handleResend}
+                    disabled={resendLoading}
+                    className="text-violet-600 hover:text-violet-700 font-bold transition-colors underline decoration-2 underline-offset-4 disabled:opacity-50"
+                  >
+                    {resendLoading ? "Resending..." : "Click here to resend the link"}
+                  </button>
+                </li>
               </ul>
+              {resendMessage && (
+                <p className="mt-4 text-xs font-bold text-violet-600 bg-violet-50 p-3 rounded-lg border border-violet-100 animate-pulse">
+                  {resendMessage}
+                </p>
+              )}
             </div>
-            <Link 
-              to="/login" 
-              className="inline-block bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Go to Login Page
-            </Link>
+
+            <div className="flex flex-col gap-3">
+              <Link 
+                to="/login" 
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-violet-200"
+              >
+                Go to Sign In
+              </Link>
+            </div>
           </div>
         ) : (
           <>
@@ -259,7 +278,7 @@ const Register = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
-                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium animate-shake">
                     {error}
                   </div>
                 )}
@@ -267,7 +286,7 @@ const Register = () => {
                 <div>
                   <label
                     htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-bold text-slate-700 mb-2"
                   >
                     Full Name
                   </label>
@@ -276,17 +295,22 @@ const Register = () => {
                     name="name"
                     type="text"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Your full name"
+                    className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                      formData.name && (/\d/.test(formData.name) || formData.name.length < 2) 
+                        ? "border-red-300 focus:border-red-500" 
+                        : "border-slate-200 focus:border-violet-600"
+                    }`}
+                    placeholder="Enter your professional name"
                     value={formData.name}
                     onChange={handleChange}
                   />
+                  <p className="text-[10px] text-slate-400 mt-1.5 uppercase font-black tracking-widest">Only letters allowed • Min 2 chars</p>
                 </div>
 
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-bold text-slate-700 mb-2"
                   >
                     Email Address
                   </label>
@@ -295,8 +319,8 @@ const Register = () => {
                     name="email"
                     type="email"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="your.email@example.com"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 outline-none transition-all"
+                    placeholder="you@company.com"
                     value={formData.email}
                     onChange={handleChange}
                   />
@@ -305,7 +329,7 @@ const Register = () => {
                 <div>
                   <label
                     htmlFor="password"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-bold text-slate-700 mb-2"
                   >
                     Password
                   </label>
@@ -314,17 +338,27 @@ const Register = () => {
                     name="password"
                     type="password"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Create a strong password"
+                    className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                      formData.password && (formData.password.length < 8 || !/\d/.test(formData.password) || !/[!@#$%^&*()]/.test(formData.password))
+                        ? "border-orange-200 focus:border-orange-500"
+                        : "border-slate-200 focus:border-violet-600"
+                    }`}
+                    placeholder="Min 8 chars + number + symbol"
                     value={formData.password}
                     onChange={handleChange}
                   />
+                  <div className="flex gap-2 mt-2">
+                    <div className={`h-1 flex-1 rounded-full ${formData.password.length >= 8 ? "bg-green-500" : "bg-slate-200"}`}></div>
+                    <div className={`h-1 flex-1 rounded-full ${/\d/.test(formData.password) ? "bg-green-500" : "bg-slate-200"}`}></div>
+                    <div className={`h-1 flex-1 rounded-full ${/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? "bg-green-500" : "bg-slate-200"}`}></div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1.5 uppercase font-black tracking-widest">Requires Number & Special Character</p>
                 </div>
 
                 <div>
                   <label
                     htmlFor="confirmPassword"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-bold text-slate-700 mb-2"
                   >
                     Confirm Password
                   </label>
@@ -333,8 +367,12 @@ const Register = () => {
                     name="confirmPassword"
                     type="password"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Confirm your password"
+                    className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                      formData.confirmPassword && formData.confirmPassword !== formData.password
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-violet-600"
+                    }`}
+                    placeholder="Repeat your password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                   />
@@ -387,14 +425,14 @@ const Register = () => {
 
                 {/* Account Information */}
                 <div className="space-y-4">
-                  <h4 className="font-medium text-gray-900">
+                  <h4 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-6">
                     Account Information
                   </h4>
 
                   <div>
                     <label
                       htmlFor="business-name"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-bold text-slate-700 mb-2"
                     >
                       Your Name
                     </label>
@@ -403,17 +441,22 @@ const Register = () => {
                       name="name"
                       type="text"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Your full name"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                        formData.name && (/\d/.test(formData.name) || formData.name.length < 2) 
+                          ? "border-red-300 focus:border-red-500" 
+                          : "border-slate-200 focus:border-violet-600"
+                      }`}
+                      placeholder="Enter your professional name"
                       value={formData.name}
                       onChange={handleChange}
                     />
+                    <p className="text-[10px] text-slate-400 mt-1.5 uppercase font-black tracking-widest">Only letters allowed • Min 2 chars</p>
                   </div>
 
                   <div>
                     <label
                       htmlFor="business-email"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-bold text-slate-700 mb-2"
                     >
                       Email Address
                     </label>
@@ -422,8 +465,8 @@ const Register = () => {
                       name="email"
                       type="email"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="your.email@company.com"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 outline-none transition-all"
+                      placeholder="you@company.com"
                       value={formData.email}
                       onChange={handleChange}
                     />
@@ -432,7 +475,7 @@ const Register = () => {
                   <div>
                     <label
                       htmlFor="business-password"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-bold text-slate-700 mb-2"
                     >
                       Password
                     </label>
@@ -441,17 +484,27 @@ const Register = () => {
                       name="password"
                       type="password"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Create a strong password"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                        formData.password && (formData.password.length < 8 || !/\d/.test(formData.password) || !/[!@#$%^&*()]/.test(formData.password))
+                          ? "border-orange-200 focus:border-orange-500"
+                          : "border-slate-200 focus:border-violet-600"
+                      }`}
+                      placeholder="Min 8 chars + number + symbol"
                       value={formData.password}
                       onChange={handleChange}
                     />
+                    <div className="flex gap-2 mt-2">
+                        <div className={`h-1 flex-1 rounded-full ${formData.password.length >= 8 ? "bg-green-500" : "bg-slate-200"}`}></div>
+                        <div className={`h-1 flex-1 rounded-full ${/\d/.test(formData.password) ? "bg-green-500" : "bg-slate-200"}`}></div>
+                        <div className={`h-1 flex-1 rounded-full ${/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? "bg-green-500" : "bg-slate-200"}`}></div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1.5 uppercase font-black tracking-widest">Requires Number & Special Character</p>
                   </div>
 
                   <div>
                     <label
                       htmlFor="business-confirmPassword"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-bold text-slate-700 mb-2"
                     >
                       Confirm Password
                     </label>
@@ -460,162 +513,120 @@ const Register = () => {
                       name="confirmPassword"
                       type="password"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Confirm your password"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm focus:ring-4 focus:ring-violet-600/10 outline-none transition-all ${
+                        formData.confirmPassword && formData.confirmPassword !== formData.password
+                          ? "border-red-300 focus:border-red-500"
+                          : "border-slate-200 focus:border-violet-600"
+                      }`}
+                      placeholder="Repeat your password"
                       value={formData.confirmPassword}
                       onChange={handleChange}
                     />
                   </div>
                 </div>
 
-                {/* Company Information */}
-                <div className="space-y-4 border-t pt-4">
-                  <h4 className="font-medium text-gray-900">
-                    Company Information
+                {/* Business Information Section */}
+                <div className="space-y-4 pt-6 border-t border-slate-100">
+                  <h4 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-6">
+                    Business Information
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="companyName"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Company Name *
-                      </label>
-                      <input
-                        id="companyName"
-                        name="companyName"
-                        type="text"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Your Company Name"
-                        value={businessData.companyName}
-                        onChange={handleBusinessChange}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="companySize"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Company Size *
-                      </label>
-                      <select
-                        id="companySize"
-                        name="companySize"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={businessData.companySize}
-                        onChange={handleBusinessChange}
-                      >
-                        <option value="">Select size</option>
-                        <option value="1-10">1-10 employees</option>
-                        <option value="11-50">11-50 employees</option>
-                        <option value="51-200">51-200 employees</option>
-                        <option value="201-1000">201-1000 employees</option>
-                        <option value="1000+">1000+ employees</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label
+                      htmlFor="companyName"
+                      className="block text-sm font-bold text-slate-700 mb-2"
+                    >
+                      Company Name
+                    </label>
+                    <input
+                      id="companyName"
+                      name="companyName"
+                      type="text"
+                      required
+                      className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 outline-none transition-all`}
+                      placeholder="Legal company name"
+                      value={businessData.companyName}
+                      onChange={handleBusinessChange}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label
-                        htmlFor="industry"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Industry *
-                      </label>
-                      <input
-                        id="industry"
-                        name="industry"
-                        type="text"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g., Technology, Finance"
-                        value={businessData.industry}
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Company Size</label>
+                      <select
+                        name="companySize"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                        value={businessData.companySize}
                         onChange={handleBusinessChange}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="location"
-                        className="block text-sm font-medium text-gray-700 mb-1"
                       >
-                        Location *
-                      </label>
+                        <option value="1-10">1-10</option>
+                        <option value="11-50">11-50</option>
+                        <option value="51-200">51-200</option>
+                        <option value="201-1000">201-1000</option>
+                        <option value="1000+">1000+</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Industry</label>
                       <input
-                        id="location"
-                        name="location"
-                        type="text"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="City, Country"
-                        value={businessData.location}
+                        name="industry"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                        placeholder="e.g. Technology"
+                        value={businessData.industry}
                         onChange={handleBusinessChange}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="website"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Website
-                    </label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Location</label>
                     <input
-                      id="website"
+                      name="location"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                      placeholder="City, Country"
+                      value={businessData.location}
+                      onChange={handleBusinessChange}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Website (Optional)</label>
+                    <input
                       name="website"
-                      type="url"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://www.yourcompany.com"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                      placeholder="https://company.com"
                       value={businessData.website}
                       onChange={handleBusinessChange}
                     />
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="description"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Company Description *
-                    </label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Company Description</label>
                     <textarea
-                      id="description"
                       name="description"
-                      required
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Tell developers about your company, mission, and what makes you unique..."
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 transition-all"
+                      placeholder="Tell us about your company..."
                       value={businessData.description}
-                      onChange={handleBusinessChange}
+                      onChange={(e) => handleBusinessChange(e as any)}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Benefits & Perks
-                    </label>
-                    <div className="flex gap-2 mb-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Benefits & Perks</label>
+                    <div className="flex gap-2 mb-3">
                       <input
                         type="text"
                         value={benefitInput}
                         onChange={(e) => setBenefitInput(e.target.value)}
-                        onKeyPress={(e) =>
-                          e.key === "Enter" &&
-                          (e.preventDefault(), addBenefit())
-                        }
-                        placeholder="e.g., Health insurance, Remote work"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addBenefit())}
+                        placeholder="e.g. Health insurance, Remote"
+                        className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-violet-600 transition-all"
                       />
                       <button
                         type="button"
                         onClick={addBenefit}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-slate-800 transition-all"
                       >
                         Add
                       </button>
@@ -624,13 +635,13 @@ const Register = () => {
                       {businessData.benefits.map((benefit, index) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100"
                         >
                           {benefit}
                           <button
                             type="button"
                             onClick={() => removeBenefit(benefit)}
-                            className="ml-2 text-blue-600 hover:text-blue-800"
+                            className="ml-2 hover:text-violet-900"
                           >
                             ×
                           </button>
@@ -640,20 +651,14 @@ const Register = () => {
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="culture"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Company Culture
-                    </label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Company Culture</label>
                     <textarea
-                      id="culture"
                       name="culture"
                       rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Describe your company culture and work environment..."
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 transition-all"
+                      placeholder="Describe your work environment..."
                       value={businessData.culture}
-                      onChange={handleBusinessChange}
+                      onChange={(e) => handleBusinessChange(e as any)}
                     />
                   </div>
                 </div>
@@ -661,7 +666,7 @@ const Register = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                  className="w-full bg-violet-600 text-white py-4 px-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-violet-700 shadow-lg shadow-violet-200 focus:outline-none focus:ring-4 focus:ring-violet-600/20 disabled:opacity-50 transition-all"
                 >
                   {loading ? "Creating Account..." : "Create Business Account"}
                 </button>

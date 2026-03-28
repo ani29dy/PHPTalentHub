@@ -8,25 +8,72 @@ const { auth } = require("../middleware/auth");
 const crypto = require("crypto");
 const { sendVerificationEmail } = require("../utils/emailService");
 
+const { verifyEmailDomain, isDummyString, isGibberish, isJunkPrefix } = require("../utils/validation");
+const { verifyEmailExistence } = require("../utils/emailVerify");
+
 const router = express.Router();
 
 // Register user
 router.post(
   "/register",
   [
-    body("name").notEmpty().withMessage("Name is required"),
-    body("email").isEmail().withMessage("Please enter a valid email"),
+    body("name")
+      .notEmpty().withMessage("Name is required")
+      .isLength({ min: 2 }).withMessage("Name must be at least 2 characters")
+      .custom((value) => {
+        if (isDummyString(value) || /\d/.test(value)) {
+          throw new Error("Please enter a professional name (no dummy or numeric names)");
+        }
+        return true;
+      }),
+    body("email")
+      .isEmail().withMessage("Please enter a valid email address")
+      .custom(async (value) => {
+        // 1. FAST PASS: Check for obvious keyboard mashes internally
+        if (isJunkPrefix(value) || isGibberish(value)) {
+          throw new Error("Please use a valid, professional email address (random keyboard strings like 'faslkdfj' are not allowed)");
+        }
+        
+        // 2. DOMAIN CHECK: Check if the domain has MX records
+        const isValidDomain = await verifyEmailDomain(value);
+        if (!isValidDomain) {
+          throw new Error("This email domain does not seem to exist or cannot receive mail. Use a real email address.");
+        }
+
+        // 3. DEEP CHECK: Call Abstract API to check if the inbox literally exists
+        const isRealInbox = await verifyEmailExistence(value);
+        if (!isRealInbox) {
+          throw new Error("This email address appears to be undeliverable or fake. Please use a verified, active email account.");
+        }
+
+        return true;
+      }),
     body("password")
-      .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters"),
+      .isLength({ min: 8 })
+      .withMessage("Password must be at least 8 characters")
+      .matches(/\d/).withMessage("Password must contain at least one number")
+      .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage("Password must contain at least one special character"),
     body("role")
-      .isIn(["developer", "business", "admin"])
-      .withMessage("Invalid role"),
+      .isIn(["developer", "business"])
+      .withMessage("Invalid role selected"),
+    
+    // Optional Business Profile Validation (only if role is business)
+    body("businessProfile.companyName").if(body("role").equals("business"))
+      .notEmpty().withMessage("Company name is required")
+      .custom(val => !isDummyString(val)).withMessage("Please enter a valid company name"),
+    body("businessProfile.website").if(body("role").equals("business")).optional({ checkFalsy: true })
+      .isURL().withMessage("Please enter a valid URL for the company website"),
+    body("businessProfile.location").if(body("role").equals("business"))
+      .notEmpty().withMessage("Company location is required")
+      .custom(val => !isDummyString(val)).withMessage("Please enter a valid location"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ 
+        message: errors.array()[0].msg,
+        errors: errors.array() 
+      });
     }
 
     const { name, email, password, role, businessProfile } = req.body;
@@ -183,6 +230,39 @@ router.get("/verify/:token", async (req, res) => {
       success: false, 
       message: "Server error during verification. Please try again later." 
     });
+  }
+});
+
+// Resend verification email
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "This account is already verified. Please log in." });
+    }
+
+    // Generate new token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = verificationToken;
+    await user.save();
+
+    // Send email
+    const emailSent = await sendVerificationEmail(user, verificationToken);
+
+    res.status(200).json({ 
+      success: true,
+      message: "Verification email resent successfully. Please check your inbox.",
+      emailSent: !!emailSent
+    });
+  } catch (err) {
+    console.error("Resend Error:", err.message);
+    res.status(500).json({ message: "Server error during resend. Please try again later." });
   }
 });
 

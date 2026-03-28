@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const rateLimit = require("express-rate-limit");
 
 dotenv.config();
 
@@ -11,6 +12,17 @@ const profileRoutes = require("./routes/profiles");
 const adminRoutes = require("./routes/admin");
 const notificationRoutes = require("./routes/notifications");
 const paymentRoutes = require("./routes/payments");
+
+// Rate limiter for auth routes
+const authLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000, // 30 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: {
+    message: "Too many attempts from this IP, please try again after 30 minutes"
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const app = express();
 app.use(express.json());
@@ -25,7 +37,7 @@ mongoose
     process.exit(1);
   });
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/profiles", profileRoutes);
 app.use("/api/admin", adminRoutes);

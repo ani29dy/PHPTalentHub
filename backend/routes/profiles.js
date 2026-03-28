@@ -6,6 +6,7 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const Activity = require("../models/Activity");
 const { auth } = require("../middleware/auth");
+const { sendVerificationEmail, sendHiringInterestEmail } = require("../utils/emailService");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const streamifier = require("streamifier");
@@ -689,17 +690,37 @@ router.get("/:userId", async (req, res) => { // Removed 'auth' middleware to kee
 router.post("/:userId/hire-notify", auth, async (req, res) => {
   try {
     const developerId = req.params.userId;
-    const profile = await Profile.findOne({ userId: developerId });
-    if (!profile) return res.status(404).json({ message: "Profile not found" });
+    
+    // 1. Fetch Developer and Recruiter Data in Parallel
+    const [developer, recruiter, developerProfile] = await Promise.all([
+      User.findById(developerId).select("name email"),
+      User.findById(req.user.user.id).select("name email businessProfile").populate("businessProfile"),
+      Profile.findOne({ userId: developerId })
+    ]);
 
-    // Track if sender is a business
+    if (!developer || !developerProfile) {
+      return res.status(404).json({ message: "Developer profile not found" });
+    }
+
+    if (!recruiter || !recruiter.businessProfile) {
+      return res.status(403).json({ message: "Only registered businesses can send hiring inquiries" });
+    }
+
+    // 2. Track activity if sender is a business (prevent self-tracking)
     if (req.user.user.role === "business" && req.user.user.id !== req.params.userId) {
-      await logAndNotify(profile._id, req.user.user.id, "hire_inquiry");
+      await logAndNotify(developerProfile._id, req.user.user.id, "hire_inquiry");
+      
+      // 3. SEND THE EMAIL (Production Grade)
+      await sendHiringInterestEmail(
+        developer, 
+        recruiter, 
+        recruiter.businessProfile
+      );
     }
     
     res.json({ message: "Notification sent & tracked" });
   } catch (err) {
-    console.error(err.message);
+    console.error("Hiring Notification Error:", err.message);
     res.status(500).send("Server error");
   }
 });
