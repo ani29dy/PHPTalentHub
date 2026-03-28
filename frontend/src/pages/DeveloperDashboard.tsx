@@ -70,6 +70,7 @@ const DeveloperDashboard = () => {
   const [appsLoading, setAppsLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const [filterType, setFilterType] = useState<string | null>(searchParams.get('filter'));
+  const [activeTab, setActiveTab] = useState<"applications" | "actions">("applications");
 
   useEffect(() => { fetchDashboardData(); fetchApplications(); }, []);
 
