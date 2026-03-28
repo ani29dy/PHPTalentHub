@@ -15,10 +15,10 @@ const paymentRoutes = require("./routes/payments");
 
 // Rate limiter for auth routes
 const authLimiter = rateLimit({
-  windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per windowMs
   message: {
-    message: "Too many attempts from this IP, please try again after 30 minutes"
+    message: "Too many attempts from this IP, please try again after 15 minutes"
   },
   standardHeaders: true,
   legacyHeaders: false,
