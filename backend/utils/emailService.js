@@ -51,7 +51,9 @@ const sendEmail = async (options) => {
  * Sends a professional verification email to new users
  */
 const sendVerificationEmail = async (user, token) => {
-  const verificationUrl = `${process.env.CLIENT_URL || 'https://phptalenthub.onrender.com'}/verify-email?token=${token}`;
+  // Sanitize CLIENT_URL (remove trailing slash if present)
+  const baseUrl = (process.env.CLIENT_URL || 'https://phptalenthub.onrender.com').replace(/\/$/, "");
+  const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
   
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1a202c;">
@@ -91,7 +93,8 @@ const sendVerificationEmail = async (user, token) => {
  * Sends a notification email to a developer when a recruiter is interested in hiring them
  */
 const sendHiringInterestEmail = async (developer, recruiter, recruiterProfile) => {
-  const dashboardUrl = `${process.env.CLIENT_URL || 'https://phptalenthub.onrender.com'}/developer-dashboard`;
+  const baseUrl = (process.env.CLIENT_URL || 'https://phptalenthub.onrender.com').replace(/\/$/, "");
+  const dashboardUrl = `${baseUrl}/developer-dashboard`;
   
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; color: #1a202c; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
