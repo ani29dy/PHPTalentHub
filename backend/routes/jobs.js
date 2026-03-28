@@ -284,7 +284,7 @@ router.post("/:jobId/apply", auth, async (req, res) => {
                   <p>Great news! A new developer has just applied for your <strong>${job.title}</strong> position on PHP Talent Hub.</p>
                   <p>Log in to your Business Dashboard to review their application, cover letter, and verify their PHP skills.</p>
                   <div style="margin: 30px 0;">
-                    <a href="http://localhost:5173/business-dashboard" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">View Dashboard</a>
+                    <a href="${(process.env.CLIENT_URL || 'https://phptalenthub.onrender.com').replace(/\/$/, '')}/business-dashboard" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">View Dashboard</a>
                   </div>
                   <p style="font-size:12px;color:#94a3b8;">This is an automated message from PHP Talent Hub.</p>
                  </div>`
@@ -387,7 +387,7 @@ router.put("/:applicationId/status", auth, async (req, res) => {
                   <p>The status of your application for the <strong>${jobDetails.title}</strong> role has been updated to: <strong style="color:${themeColor};text-transform:uppercase;">${status}</strong>.</p>
                   <p>${isAccepted ? "The company should reach out to you shortly for the next steps!" : "Don't be discouraged! There are hundreds of other verified PHP jobs waiting for you."}</p>
                   <div style="margin: 30px 0;">
-                    <a href="http://localhost:5173/developer-dashboard" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Go to Dashboard</a>
+                    <a href="${(process.env.CLIENT_URL || 'https://phptalenthub.onrender.com').replace(/\/$/, '')}/developer-dashboard" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Go to Dashboard</a>
                   </div>
                   <p style="font-size:12px;color:#94a3b8;">This is an automated message from PHP Talent Hub.</p>
                  </div>`

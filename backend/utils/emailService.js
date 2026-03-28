@@ -107,9 +107,10 @@ const sendVerificationEmail = async (user, token) => {
 };
 
 /**
- * Sends a notification email to a developer when a recruiter is interested in hiring them
+ * Sends a notification email to a developer when a recruiter is interested in hiring them.
+ * Accepts an optional prebuilt customHtml — otherwise uses the default template.
  */
-const sendHiringInterestEmail = async (developer, recruiter, recruiterProfile) => {
+const sendHiringInterestEmail = async (developer, recruiter, recruiterProfile, customHtml) => {
   const baseUrl = (process.env.CLIENT_URL || 'https://phptalenthub.onrender.com').replace(/\/$/, "");
   const dashboardUrl = `${baseUrl}/developer-dashboard`;
   
@@ -167,7 +168,7 @@ const sendHiringInterestEmail = async (developer, recruiter, recruiterProfile) =
   return await sendEmail({
     email: developer.email,
     subject: `💼 Hiring Interest: ${recruiter.name} from ${recruiterProfile.companyName}`,
-    html,
+    html: customHtml || html,
   });
 };
 

@@ -65,6 +65,11 @@ const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hireModal, setHireModal] = useState(false);
+  const [hirePosition, setHirePosition] = useState("");
+  const [hireSending, setHireSending] = useState(false);
+  const [hireSuccess, setHireSuccess] = useState("");
+  const [hireError, setHireError] = useState("");
 
   useEffect(() => {
     if (userId) fetchProfile();
@@ -108,25 +113,95 @@ const Profile = () => {
   const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
   const avatarColor = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 
-  const hireMailto = `mailto:${email}?subject=PHP Developer Opportunity — PHPTalentHub&body=Hi ${name},%0D%0A%0D%0AI found your profile on PHPTalentHub and would love to discuss a PHP opportunity with you.%0D%0A%0D%0ABest regards`;
-
-  const handleHireClick = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (token && user?.role === "business") {
-      try {
-        await axios.post(`/api/profiles/${userId}/hire-notify`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (err) {
-        console.error("Failed to notify dev automatically", err);
-      }
+  const handleHireClick = () => {
+    if (!token || user?.role !== "business") {
+      alert("Please log in as a Business to send a hire inquiry.");
+      return;
     }
-    window.location.href = hireMailto;
+    setHireModal(true);
+    setHireError("");
+    setHirePosition("");
   };
+
+  const handleConfirmHire = async () => {
+    if (!hirePosition.trim()) {
+      setHireError("Please enter the position you are hiring for.");
+      return;
+    }
+    setHireSending(true);
+    setHireError("");
+    try {
+      const res = await axios.post(
+        `/api/profiles/${userId}/hire-notify`,
+        { position: hirePosition.trim() },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setHireModal(false);
+      setHireSuccess(res.data.message || `Hire inquiry sent to ${name} successfully!`);
+      setTimeout(() => setHireSuccess(""), 6000);
+    } catch (err: any) {
+      setHireError(err.response?.data?.message || "Failed to send inquiry. Please try again.");
+    } finally {
+      setHireSending(false);
+    }
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      {/* Hire Inquiry Modal */}
+      {hireModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7 animate-fade-in-up">
+            <h3 className="text-xl font-black text-slate-900 mb-1">Send Hire Inquiry</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              An email will be sent to <strong>{name}</strong> with your company details and the position you're hiring for.
+            </p>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Position / Role</label>
+            <input
+              type="text"
+              autoFocus
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 outline-none mb-3"
+              placeholder="e.g. Senior PHP Developer, Backend Engineer"
+              value={hirePosition}
+              onChange={(e) => setHirePosition(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleConfirmHire()}
+            />
+            {hireError && (
+              <p className="text-red-600 text-xs font-semibold mb-3">{hireError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setHireModal(false)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmHire}
+                disabled={hireSending}
+                className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-black text-sm transition-colors disabled:opacity-60"
+              >
+                {hireSending ? "Sending..." : "✉ Send Inquiry"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-5">
+
+        {/* Success Banner */}
+        {hireSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-5 py-4 rounded-2xl flex items-start gap-3 shadow-sm animate-fade-in-up">
+            <span className="text-2xl">✅</span>
+            <div>
+              <p className="font-bold text-sm">{hireSuccess}</p>
+              <p className="text-xs text-emerald-600 mt-0.5">The developer will receive an email with your company details and position info.</p>
+            </div>
+          </div>
+        )}
 
         {/* Hero card */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -177,7 +252,7 @@ const Profile = () => {
                 </button>
               )}
               <button onClick={handleHireClick} className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-violet-200">
-                ✉ Hire via Email
+                ✉ Send Hire Inquiry
               </button>
               {profile.portfolio && (
                 <button 

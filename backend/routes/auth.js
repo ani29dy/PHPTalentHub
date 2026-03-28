@@ -72,57 +72,13 @@ router.post(
       .isIn(["developer", "business"])
       .withMessage("Invalid role selected"),
 
-    // Optional Business Profile Validation (only if role is business and businessProfile exists)
-    body("businessProfile")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
-      .isObject()
-      .withMessage("Business profile must be an object"),
+    // Business: only companyName is required at signup; all other details are set via profile settings
     body("businessProfile.companyName")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
+      .if((value, { req }) => req.body.role === "business")
       .notEmpty()
       .withMessage("Company name is required")
       .isLength({ min: 2, max: 100 })
       .withMessage("Company name must be between 2 and 100 characters"),
-    body("businessProfile.companySize")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
-      .isIn(["1-10", "11-50", "51-200", "201-1000", "1000+"])
-      .withMessage("Please select a valid company size"),
-    body("businessProfile.industry")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
-      .notEmpty()
-      .withMessage("Industry is required")
-      .isLength({ min: 2, max: 50 })
-      .withMessage("Industry must be between 2 and 50 characters"),
-    body("businessProfile.location")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
-      .notEmpty()
-      .withMessage("Company location is required")
-      .isLength({ min: 2, max: 100 })
-      .withMessage("Location must be between 2 and 100 characters"),
-    body("businessProfile.description")
-      .if(
-        (value, { req }) =>
-          req.body.role === "business" && req.body.businessProfile,
-      )
-      .notEmpty()
-      .withMessage("Company description is required")
-      .isLength({ min: 10, max: 1000 })
-      .withMessage("Description must be between 10 and 1000 characters"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -157,19 +113,26 @@ router.post(
 
       // Create business profile if registering as business
       let newBusinessProfile = null;
-      if (role === "business" && businessProfile) {
+      if (role === "business") {
+        const companyName = businessProfile?.companyName;
+        if (!companyName) {
+          await User.findByIdAndDelete(user._id);
+          return res.status(400).json({ message: "Company name is required for business registration." });
+        }
         newBusinessProfile = new BusinessProfile({
           user: user._id,
-          ...businessProfile,
+          companyName,
+          // Other fields optional — filled in via Business Profile Settings
           verified: false,
           verificationRequested: false,
         });
         await newBusinessProfile.save();
 
-        // Update user with business profile reference
+        // Link profile to user
         user.businessProfile = newBusinessProfile._id;
         await user.save();
       }
+
 
       // Send Verification Email
       const emailSent = await sendVerificationEmail(
