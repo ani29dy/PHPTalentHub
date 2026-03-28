@@ -16,6 +16,7 @@ import EditJob from "./pages/EditJob";
 import EditBusinessProfile from "./pages/EditBusinessProfile";
 import EditDeveloperProfile from "./pages/EditDeveloperProfile";
 import VerifyEmail from "./pages/VerifyEmail";
+import PremiumUpgrade from "./pages/PremiumUpgrade";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -87,6 +88,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={["developer"]}>
                   <EditDeveloperProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/premium/upgrade"
+              element={
+                <ProtectedRoute allowedRoles={["developer"]}>
+                  <PremiumUpgrade />
                 </ProtectedRoute>
               }
             />

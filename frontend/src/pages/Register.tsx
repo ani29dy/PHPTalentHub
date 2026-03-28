@@ -32,7 +32,7 @@ const Register = () => {
   });
   const [businessData, setBusinessData] = useState<BusinessProfileData>({
     companyName: "",
-    companySize: "",
+    companySize: "1-10",
     industry: "",
     location: "",
     website: "",

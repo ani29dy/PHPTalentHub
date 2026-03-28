@@ -157,7 +157,7 @@ const DeveloperDashboard = () => {
                 ✓ VERIFIED PRO
               </span>
             ) : (
-              <Link to="/developer/profile/edit" className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs font-black px-5 py-2.5 rounded-xl shadow-lg shadow-violet-200 transition-all uppercase tracking-wider">
+              <Link to="/premium/upgrade" className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs font-black px-5 py-2.5 rounded-xl shadow-lg shadow-violet-200 transition-all uppercase tracking-wider">
                 Upgrade to Premium ✨
               </Link>
             )}

@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Set global axios defaults
-  axios.defaults.baseURL = "http://localhost:5000";
+  axios.defaults.baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:5000");
 
   // Request Interceptor: Attach token to every request
   useEffect(() => {
